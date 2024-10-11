@@ -27,7 +27,9 @@ final class RevoltCurlResponse implements ResponseInterface, StreamableInterface
     use CommonResponseTrait {
         getContent as private doGetContent;
     }
-    use TransportResponseTrait;
+    use TransportResponseTrait {
+        stream as private doStream;
+    }
 
     const DELAY = 1 / 2000;
     public RevoltCurlClientState $multi;
@@ -201,6 +203,23 @@ final class RevoltCurlResponse implements ResponseInterface, StreamableInterface
                 $multi->dnsCache->removals = $multi->dnsCache->hostnames = [];
             }
         });
+    }
+
+    public static function stream(iterable $responses, ?float $timeout = null): \Generator
+    {
+        $locks = [];
+        foreach ($responses as $response) {
+            assert($response instanceof self);
+            $locks[] = $response->multi->lock();
+        }
+
+        try {
+            yield from self::doStream($responses, $timeout);
+        } finally {
+            foreach ($locks as $lock) {
+                $lock->release();
+            }
+        }
     }
 
     public function getInfo(?string $type = null): mixed

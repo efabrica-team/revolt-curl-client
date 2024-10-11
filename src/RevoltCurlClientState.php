@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Efabrica\RevoltCurlClient;
 
+use Amp\Sync\LocalSemaphore;
+use Amp\Sync\Lock;
+use Amp\Sync\Semaphore;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpClient\Internal\ClientState;
 use Symfony\Component\HttpClient\Internal\DnsCache;
@@ -17,6 +20,7 @@ use Symfony\Component\HttpClient\Internal\DnsCache;
  */
 final class RevoltCurlClientState extends ClientState
 {
+    private Semaphore $semaphore;
     public ?\CurlMultiHandle $handle;
     public ?\CurlShareHandle $share;
     public bool $performing = false;
@@ -34,6 +38,7 @@ final class RevoltCurlClientState extends ClientState
     public function __construct(int $maxHostConnections, int $maxPendingPushes)
     {
         self::$curlVersion ??= curl_version();
+        $this->semaphore = new LocalSemaphore(1);
 
         $this->handle = curl_multi_init();
         $this->dnsCache = new DnsCache();
@@ -44,7 +49,8 @@ final class RevoltCurlClientState extends ClientState
             curl_multi_setopt($this->handle, \CURLMOPT_PIPELINING, \CURLPIPE_MULTIPLEX);
         }
         if (\defined('CURLMOPT_MAX_HOST_CONNECTIONS')) {
-            $maxHostConnections = curl_multi_setopt($this->handle, \CURLMOPT_MAX_HOST_CONNECTIONS, 0 < $maxHostConnections ? $maxHostConnections : \PHP_INT_MAX) ? 0 : $maxHostConnections;
+            $maxHostConnections = curl_multi_setopt($this->handle, \CURLMOPT_MAX_HOST_CONNECTIONS,
+                0 < $maxHostConnections ? $maxHostConnections : \PHP_INT_MAX) ? 0 : $maxHostConnections;
         }
         if (\defined('CURLMOPT_MAXCONNECTS') && 0 < $maxHostConnections) {
             curl_multi_setopt($this->handle, \CURLMOPT_MAXCONNECTS, $maxHostConnections);
@@ -69,7 +75,8 @@ final class RevoltCurlClientState extends ClientState
         $multi->handlesActivity = &$this->handlesActivity;
         $multi->openHandles = &$this->openHandles;
 
-        curl_multi_setopt($this->handle, \CURLMOPT_PUSHFUNCTION, static fn ($parent, $pushed, array $requestHeaders) => $multi->handlePush($parent, $pushed, $requestHeaders, $maxPendingPushes));
+        curl_multi_setopt($this->handle, \CURLMOPT_PUSHFUNCTION,
+            static fn($parent, $pushed, array $requestHeaders) => $multi->handlePush($parent, $pushed, $requestHeaders, $maxPendingPushes));
     }
 
     public function reset(): void
@@ -111,12 +118,12 @@ final class RevoltCurlClientState extends ClientState
             return \CURL_PUSH_DENY;
         }
 
-        $url = $headers[':scheme'][0].'://'.$headers[':authority'][0];
+        $url = $headers[':scheme'][0] . '://' . $headers[':authority'][0];
 
         // curl before 7.65 doesn't validate the pushed ":authority" header,
         // but this is a MUST in the HTTP/2 RFC; let's restrict pushes to the original host,
         // ignoring domains mentioned as alt-name in the certificate for now (same as curl).
-        if (!str_starts_with($origin, $url.'/')) {
+        if (!str_starts_with($origin, $url . '/')) {
             $this->logger?->debug(sprintf('Rejecting pushed response from "%s": server is not authoritative for "%s"', $origin, $url));
 
             return \CURL_PUSH_DENY;
@@ -131,9 +138,15 @@ final class RevoltCurlClientState extends ClientState
         $url .= $headers[':path'][0];
         $this->logger?->debug(sprintf('Queueing pushed response: "%s"', $url));
 
-        $this->pushedResponses[$url] = new RevoltPushedResponse(new RevoltCurlResponse($this, $pushed), $headers, $this->openHandles[(int) $parent][1] ?? [], $pushed);
+        $this->pushedResponses[$url] = new RevoltPushedResponse(new RevoltCurlResponse($this, $pushed), $headers,
+            $this->openHandles[(int)$parent][1] ?? [], $pushed);
 
         return \CURL_PUSH_OK;
+    }
+
+    public function lock(): Lock
+    {
+        return $this->semaphore->acquire();
     }
 }
 
