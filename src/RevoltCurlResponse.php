@@ -31,7 +31,7 @@ final class RevoltCurlResponse implements ResponseInterface, StreamableInterface
         stream as private doStream;
     }
 
-    const DELAY = 1 / 2000;
+    const DELAY = 1 / 500;
     public RevoltCurlClientState $multi;
 
     /**
