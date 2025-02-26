@@ -297,7 +297,7 @@ final class RevoltCurlResponse implements ResponseInterface, StreamableInterface
     /**
      * @param RevoltCurlClientState $multi
      */
-    private static function perform(ClientState $multi, ?array &$responses = null): void
+    private static function perform(ClientState $multi, ?array $responses = null): void
     {
         if ($multi->performing) {
             if ($responses) {
