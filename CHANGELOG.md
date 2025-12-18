@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-
+## [0.1.4] - 2025-12-18
+### Added
+- Allow to use symfony/http-client version 8.0
 
 ## [0.1.3] - 2025-02-26
 ### Fixed
@@ -24,7 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2024-08-21
 - Initial release
 
-[Unreleased]: https://github.com/efabrica-team/revolt-curl-client/compare/0.1.3...main
+[Unreleased]: https://github.com/efabrica-team/revolt-curl-client/compare/0.1.4...main
+[0.1.4]: https://github.com/efabrica-team/revolt-curl-client/compare/0.1.3...0.1.4
 [0.1.3]: https://github.com/efabrica-team/revolt-curl-client/compare/0.1.2...0.1.3
 [0.1.2]: https://github.com/efabrica-team/revolt-curl-client/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/efabrica-team/revolt-curl-client/compare/0.1.0...0.1.1
